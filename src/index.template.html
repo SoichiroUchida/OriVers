@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OriVers 袋モデル</title>
+<style>
+:root{
+  --bg:#f6f4ef; --panel:#ffffff; --ink:#1d2329; --muted:#66707a; --line:#d9d5cc; --soft:#efece5;
+  --accent:#2E5A87; --accent-ink:#ffffff; --ok:#2f7d4f; --bad:#b8322a;
+  --front:#F4EBDD; --back:#2E5A87; --mount:#d2322b; --valley:#1f5fbf; --target:#c9873a;
+  --grid:#e7e3da;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15191d; --panel:#1d2227; --ink:#e6e8ea; --muted:#9aa3ab; --line:#343b42; --soft:#252b31;
+    --accent:#6f9fd0; --accent-ink:#0f1215; --ok:#5fbf86; --bad:#ef6b62; --mount:#ff6b5e; --valley:#6aa8ff;
+    --target:#e0a45a; --grid:#2a3036;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15191d; --panel:#1d2227; --ink:#e6e8ea; --muted:#9aa3ab; --line:#343b42; --soft:#252b31;
+  --accent:#6f9fd0; --accent-ink:#0f1215; --ok:#5fbf86; --bad:#ef6b62; --mount:#ff6b5e; --valley:#6aa8ff;
+  --target:#e0a45a; --grid:#2a3036;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif}
+header{display:flex;align-items:baseline;gap:14px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--panel);height:var(--hdr);box-sizing:border-box;overflow:hidden}
+:root{--hdr:48px}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.02em}
+header .sub{color:var(--muted);font-size:12.5px;flex:1}
+header button{font-size:12px}
+/* wide screens: controls on the left (scroll on their own), results on the right */
+.wrap{display:grid;grid-template-columns:360px minmax(0,1fr);gap:14px;padding:14px;max-width:1800px;margin:0 auto;align-items:start}
+aside{display:flex;flex-direction:column;gap:12px;min-width:0;position:sticky;top:14px;max-height:calc(100vh - var(--hdr) - 28px);overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+header .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+button,select,input[type=number]{font:inherit;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:8px 14px}
+button:disabled{opacity:.5;cursor:default}
+.tabs{display:flex;gap:4px;margin-bottom:10px}
+.tabs button{flex:1;padding:5px 4px;font-size:13px}
+.tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.presets button{padding:3px;display:flex;flex-direction:column;align-items:center;font-size:11px;gap:1px}
+.presets button.on{outline:2px solid var(--accent);outline-offset:-1px}
+.presets svg{width:48px;height:48px;display:block}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.row label{font-size:13px}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+#ed-svg{width:100%;aspect-ratio:1;display:block;background:var(--panel);border:1px solid var(--line);border-radius:6px;cursor:crosshair;touch-action:none}
+.ed-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.ed-btns button{font-size:12.5px;padding:5px 6px}
+.drop{display:block;border:1.5px dashed var(--line);border-radius:8px;padding:14px;text-align:center;color:var(--muted);cursor:pointer;font-size:13px}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop input{display:none}
+.imgprev{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.imgprev canvas,.imgprev svg{width:100%;border:1px solid var(--line);border-radius:4px;background:#fff;display:block}
+.slider{display:grid;grid-template-columns:90px 1fr 54px;gap:6px;align-items:center;font-size:12.5px}
+.slider b{font-weight:500;text-align:right}
+#progress{font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;max-height:150px;overflow:auto;background:var(--soft);border-radius:6px;padding:6px 8px;margin-top:8px;white-space:pre-wrap}
+#progress:empty{display:none}
+.exports{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.exports button{font-size:12.5px}
+main{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;align-content:start;min-width:0}
+aside{scrollbar-width:thin}
+#tores{display:none}
+.view{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px 12px;min-width:0}
+.view h3{font-size:13.5px;margin:0 0 2px;font-weight:620}
+.view p.cap{font-size:12px;color:var(--muted);margin:0 0 6px}
+.view svg{width:100%;aspect-ratio:1;display:block}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
+.legend i.sw{width:12px;height:12px;border:1px solid var(--line);vertical-align:-2px}
+table.stats{width:100%;border-collapse:collapse;font-size:13px}
+table.stats td{padding:4px 2px;border-bottom:1px solid var(--soft);vertical-align:top}
+table.stats td:first-child{color:var(--muted);width:48%}
+table.stats td:last-child{font-variant-numeric:tabular-nums}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.verdict{margin-top:8px;padding:8px 10px;border-radius:7px;background:var(--soft);font-size:13px}
+.toggles{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}
+/* narrow windows and phones: the previous single-column layout */
+@media (max-width:820px){
+  .wrap{grid-template-columns:1fr}
+  aside{position:static;max-height:none;overflow:visible;padding-right:0}
+  main{grid-template-columns:1fr}
+  header{height:auto;flex-wrap:wrap}
+  header .sub{white-space:normal;flex-basis:100%;order:3}
+  #tores{display:inline-block}
+}
+@media (max-width:520px){.wrap{padding:10px 16px}header{padding:8px 16px}header .sub{display:none}.presets{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>OriVers 袋モデル</h1>
+  <span class="sub">紙の縁で <i>T</i> の輪郭をなぞり、<i>T</i> の上だけに<b>裏面（色）</b>を出し、<i>T</i> の外には色を一切出さない折り方を、境界一致の折線 ＋ 袋モデルの厳密な層順序（SAT）で求めます</span>
+  <button id="themebtn" type="button">テーマ</button>
+</header>
+<div class="wrap">
+<aside>
+  <div class="card">
+    <h2>入力図形 T</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="preset" class="on">プリセット</button>
+      <button type="button" data-tab="editor">エディタ</button>
+      <button type="button" data-tab="image">画像</button>
+    </div>
+    <div data-pane="preset">
+      <div class="presets" id="presets"></div>
+    </div>
+    <div data-pane="editor" hidden>
+      <svg id="ed-svg" viewBox="-0.03 -0.03 1.06 1.06" aria-label="多角形エディタ"></svg>
+      <div class="row">
+        <label><input type="checkbox" id="ed-snap" checked> グリッドに吸着 (1/20)</label>
+      </div>
+      <div class="ed-btns">
+        <button type="button" id="ed-closeT">外周として閉じる</button>
+        <button type="button" id="ed-closeH">穴として閉じる</button>
+        <button type="button" id="ed-undo">1点戻す</button>
+        <button type="button" id="ed-delpoly">最後の多角形を削除</button>
+        <button type="button" id="ed-load">表示中の形を読込</button>
+        <button type="button" id="ed-clear">全消去</button>
+      </div>
+      <div class="row">
+        <label class="drop" style="flex:1;padding:6px" for="ed-json">JSON {T, holes} を読込<input type="file" id="ed-json" accept=".json,application/json"></label>
+      </div>
+      <p class="hint" id="ed-msg">クリックで頂点を追加。外周（成分）は複数可、穴は外周の内側に。座標は [0,1]²。</p>
+      <div class="row"><button type="button" class="primary" id="ed-use" style="width:100%">この形を使う</button></div>
+    </div>
+    <div data-pane="image" hidden>
+      <label class="drop" id="drop" for="imgfile">画像をドロップ、またはクリックして選択<input type="file" id="imgfile" accept="image/*"></label>
+      <div id="imgctl" hidden>
+        <div class="slider" style="margin-top:8px"><span>しきい値</span><input type="range" id="th" min="1" max="254" value="128"><b id="v-th">128</b></div>
+        <div class="slider"><span>単純化</span><input type="range" id="eps" min="2" max="60" value="15"><b id="v-eps">1.5 px</b></div>
+        <div class="slider"><span>最小面積</span><input type="range" id="minar" min="1" max="100" value="30"><b id="v-min">0.30 %</b></div>
+        <div class="row"><label><input type="checkbox" id="inv"> 明暗を反転</label></div>
+        <div class="imgprev"><canvas id="cv-bin"></canvas><svg id="sv-poly" viewBox="0 0 100 100"></svg></div>
+        <p class="hint" id="imgstat">—</p>
+        <div class="row"><button type="button" class="primary" id="useimg" style="width:100%">この形を使う</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>計算</h2>
+    <div class="row">
+      <label for="mode">方式</label>
+      <select id="mode">
+        <option value="dk" selected>DK+SAT（既存・正方形から直接）</option>
+        <option value="strip">帯の方法（一般の T・証明つき）</option>
+      </select>
+    </div>
+    <div id="strip-opts" hidden>
+      <div class="row">
+        <label for="st-w" title="lem:bands の開きの幅 w（[0,1]² の単位）。大きいほど尺度 λ と行の数が小さくなる傾向">開きの幅 w</label>
+        <input type="number" id="st-w" value="3" min="0.2" max="20" step="0.5" style="width:70px">
+        <label for="st-trials" title="回転角と一般の摂動の試行回数（行の数が最小のものを採用）">試行</label>
+        <input type="number" id="st-trials" value="40" min="1" max="200" style="width:60px">
+      </div>
+      <div class="row">
+        <label for="st-max">行の数の上限</label>
+        <input type="number" id="st-max" value="3000" min="10" max="20000" step="100" style="width:80px">
+        <label><input type="checkbox" id="st-square"> 正方形の展開図も描く（大きい）</label>
+      </div>
+      <div class="row"><button type="button" class="primary" id="st-run" style="margin-left:auto">帯の方法で計算</button></div>
+    </div>
+    <div id="dk-opts">
+    <div class="row">
+      <label for="paperkind">紙の形</label>
+      <select id="paperkind">
+        <option value="auto" selected>正方形（自動：2 種の境界割当を順に試す）</option>
+        <option value="square">正方形（鋭い下界）</option>
+        <option value="tri">正三角形</option>
+        <option value="hex">正六角形</option>
+        <option value="legacy">正方形（旧境界割当・論文図）</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="foldin" title="凸包の支持線の外側を紙の束ごと裏へ折り込む。袋モデルの全節を満たし続ける線だけを採用する">凸包へ折り込む（安全な線のみ）</label>
+      <input type="checkbox" id="foldin" checked>
+      <label for="maxc">候補数上限</label>
+      <input type="number" id="maxc" value="20" min="1" max="60" style="width:70px">
+      <button type="button" class="primary" id="run" style="margin-left:auto">計算する</button>
+      <button type="button" id="tores">結果を見る ↓</button>
+    </div>
+    </div>
+    <div id="progress"></div>
+  </div>
+
+  <div class="card">
+    <h2>書き出し</h2>
+    <div class="row"><label for="sheet">用紙サイズ</label><input type="number" id="sheet" value="150" min="10" max="2000" step="5" style="width:80px"><span class="hint" style="margin:0">mm（SVG）／ .cp は一辺 400</span></div>
+    <div class="exports">
+      <button type="button" id="x-cpsvg" disabled>展開図 .svg</button>
+      <button type="button" id="x-cp" disabled>展開図 .cp</button>
+      <button type="button" id="x-fold" disabled>完成形 .svg</button>
+      <button type="button" id="x-json" disabled>層順序 .json</button>
+    </div>
+    <p class="hint">展開図 SVG は ORIPA / Oriedita 互換（線のみ・グループなし・輪郭 rgb(0,0,0)・山 rgb(255,0,0)・谷 rgb(0,0,255)）。</p>
+  </div>
+</aside>
+
+<main>
+  <section class="view">
+    <h3>(a) 目標図形 <i>T</i></h3>
+    <p class="cap" id="cap-a">—</p>
+    <svg id="v-target" viewBox="0 0 1 1"></svg>
+  </section>
+  <section class="view sview" hidden style="grid-column:1/-1">
+    <h3>帯の方法（paper_v6 §5b–§5d、すべての段に証明あり・SAT なし）</h3>
+    <ol class="cap" style="margin:4px 0 0 18px;padding:0;line-height:1.6">
+      <li><b>帯の分解</b>（補題「帯の分解」）：(0) もとの辺の各対を分ける直線で、水路だけの開きを順に行う（共有する頂点をもつ対では、その頂点を通る直線）。各頂点を通る直線で反射頂点が消えるので、これだけで各片は凸になる（論文の (i)(ii) の水平線は省略できる。展開図が小さくなる）。直線の向きは試行ごとに変え、行の数が最小の分解を採用する。各片は凸多角形で、持ち主の要る辺（∂<i>T</i> 由来の辺）は高々 1 本。残りの辺は壁で、持ち主は要らない（補題「壁の持ち主は要らない」）。</li>
+      <li><b>尺度と行</b>：配置全体を λ 倍し、各片を持ち主の要る辺に平行な、高さ (1/2, 1] の行に分ける。第 1 行は帯の辺 A をその辺に置く。最後の行は三角形でもよい。</li>
+      <li><b>帯の状態 Φ</b>：紙 <i>Q</i> = [0, <i>L</i>] × [0, 1] を、行の部品（段折りの始まり・入口の口・行・出口の口・段折りの終端）と綱の部品（2 つ折りの帯。曲がりは入る向きと出る向きの二等分線で全層を折り、後の部分を上に置く）で順に置く。層順序は部品の番号で比べる辞書式順序（後の部品が上）と、部品の中の明示的な順序（口の順序 H、U ターンの順序、2 つのブロック）だけで決まる。</li>
+      <li><b>閉じる</b>：開きを逆順に全層の段折り（補題「全層の段折り」：N ≻ M ≻ F′、M の中は逆順）で閉じる。壁は内部のジップになり、紙 <i>Q</i> からの <i>T</i> の実現が得られる。</li>
+      <li><b>正方形</b>：<i>L</i> = 2<i>m</i> + 1 とし、一辺 <i>L</i> の正方形を蛇腹 <i>K</i> に折って帯 <i>Q</i> と合成する（補題「蛇腹」「厚い紙」）。正方形の展開図は帯の展開図を 2<i>m</i> + 1 層に引き戻したもの。</li>
+    </ol>
+    <p class="cap" style="margin-top:6px">注意：構成は有限だが大きい。行の数は尺度 λ（頂点の距離の差 &gt; 1/2 と、開きの幅 &gt; 部品の余白）で決まり、数百行になることが多い。</p>
+  </section>
+  <section class="view sview" hidden>
+    <h3>(e) 基底の分解：片・行・綱の経路</h3>
+    <p class="cap" id="cap-e">—</p>
+    <canvas id="c-base" style="width:100%;aspect-ratio:1;display:block"></canvas>
+    <div class="legend"><span><i class="sw" style="background:#cfdcea"></i>片</span><span><i style="border-color:#c9873a;border-top-width:3px"></i>持ち主の要る辺</span><span><i style="border-color:#7d8a96"></i>行の境界</span><span><i style="border-color:#9a6fb0"></i>綱の中心線</span></div>
+  </section>
+  <section class="view sview" hidden>
+    <h3>(f) 帯 <i>Q</i> の展開図（閉じた後）</h3>
+    <p class="cap" id="cap-f">—</p>
+    <canvas id="c-strip" style="width:100%;aspect-ratio:1;display:block"></canvas>
+    <div class="legend"><span><i style="border-color:var(--mount)"></i>山折り</span><span><i style="border-color:var(--valley)"></i>谷折り</span></div>
+  </section>
+  <section class="view sview" hidden>
+    <h3>(g) 完成形（各点の最上層の色）</h3>
+    <p class="cap" id="cap-g">—</p>
+    <canvas id="c-fold" style="width:100%;aspect-ratio:1;display:block"></canvas>
+    <div class="legend"><span><i class="sw" style="background:#F4EBDD"></i>表面（白）</span><span><i class="sw" style="background:#2E5A87"></i>裏面（色）</span><span><i style="border-color:#c9873a;border-top-style:dashed"></i>∂<i>T</i></span></div>
+    <div class="toggles"><label><input type="checkbox" id="t-phi"> 閉じる前の帯の状態 Φ を表示</label></div>
+  </section>
+  <section class="view sview" hidden>
+    <h3>(h) 正方形の展開図（蛇腹との合成）</h3>
+    <p class="cap" id="cap-h">左の「正方形の展開図も描く」をオンにすると描画します。</p>
+    <canvas id="c-square" style="width:100%;aspect-ratio:1;display:block"></canvas>
+  </section>
+  <section class="view sview" hidden>
+    <h3>(i) 統計</h3>
+    <table class="stats" id="sstats"><tbody></tbody></table>
+  </section>
+  <section class="view dkview">
+    <h3>(b) 展開図（折線パターン）</h3>
+    <p class="cap" id="cap-b">山谷は厳密な層順序から決定（上の面が裏向きなら谷）。</p>
+    <svg id="v-cp" viewBox="0 0 1 1"></svg>
+    <div class="legend"><span><i style="border-color:var(--mount)"></i>山折り</span><span><i style="border-color:var(--valley);border-top-style:dashed"></i>谷折り</span><span><i style="border-color:var(--muted);opacity:.5"></i>平坦な辺</span></div>
+    <div class="toggles"><label><input type="checkbox" id="t-flat"> 平坦な辺（折らない三角形分割の辺）を表示</label></div>
+  </section>
+  <section class="view dkview">
+    <h3>(c) 完成形（上から見た図）</h3>
+    <p class="cap">層順序に従って各セルの最上層を描画。点線が ∂<i>T</i>。<i>T</i> の外に見える紙は必ず表（白）です（キャップ定理）。</p>
+    <svg id="v-fold" viewBox="0 0 1 1"></svg>
+    <div class="legend"><span><i class="sw" style="background:#F4EBDD"></i>表面</span><span><i class="sw" style="background:#2E5A87"></i>裏面</span></div>
+    <div class="toggles"><label><input type="checkbox" id="t-edges"> 面の輪郭を重ねる</label></div>
+  </section>
+  <section class="view dkview">
+    <h3>(d) 統計と検証</h3>
+    <table class="stats" id="stats"><tbody><tr><td>状態</td><td>形を選んで「計算する」</td></tr></tbody></table>
+    <div class="verdict" id="verdict" hidden></div>
+  </section>
+</main>
+</div>
+
+<script id="ov-lib">
+/*@@ORIVERS_LIB@@*/
+</script>
+<script>
+"use strict";
+const PRESETS=/*@@SHAPES@@*/;
+const NAMES={arrow:'矢印',checker3:'市松',cross:'十字',diag:'対角2枚',dots:'水玉',ell:'L字',frame:'額縁',heart:'ハート',
+  hexring:'六角環',house:'家',letterF:'文字F',moon:'月',square:'正方形',star:'星',stripe:'横帯',triangle:'三角形'};
+const NS='http://www.w3.org/2000/svg';
+const $=id=>document.getElementById(id);
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+const f4=x=>(+x).toFixed(4);
+const pathOf=(rings,tf)=>rings.map(R=>'M'+R.map(p=>{const q=tf(p);return q[0].toFixed(5)+' '+q[1].toFixed(5);}).join('L')+'Z').join('');
+
+/* ---------------- state ---------------- */
+let SHAPE={name:'square',T:PRESETS.find(p=>p.name==='square').T,holes:[]};
+let RESULT=null, WORKER=null, RUNNING=false;
+
+/* ---------------- theme ---------------- */
+$('themebtn').onclick=()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const dark=cur?cur==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+};
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('[data-pane]').forEach(p=>p.hidden=p.dataset.pane!==b.dataset.tab);
+  if(b.dataset.tab==='editor')drawEditor();
+});
+
+/* ---------------- presets ---------------- */
+function shapeIcon(sh,svg){
+  el('rect',{x:0,y:0,width:1,height:1,fill:'none',stroke:'currentColor','stroke-width':0.03,opacity:.35},svg);
+  el('path',{d:pathOf([...sh.T,...(sh.holes||[])],p=>[p[0],1-p[1]]),fill:'currentColor','fill-rule':'evenodd',opacity:.8},svg);
+}
+function buildPresets(){
+  const box=$('presets');box.innerHTML='';
+  for(const p of PRESETS){
+    const b=document.createElement('button');b.type='button';b.title=p.name;
+    const s=el('svg',{viewBox:'-0.05 -0.05 1.1 1.1'});shapeIcon(p,s);b.appendChild(s);
+    const t=document.createElement('span');t.textContent=NAMES[p.name]||p.name;b.appendChild(t);
+    b.onclick=()=>{setShape({name:p.name,T:p.T,holes:p.holes||[]});};
+    b.dataset.name=p.name;box.appendChild(b);
+  }
+  markPreset();
+}
+function markPreset(){document.querySelectorAll('#presets button').forEach(b=>b.classList.toggle('on',b.dataset.name===SHAPE.name));}
+function setShape(sh,run){
+  SHAPE={name:sh.name,T:sh.T.map(r=>r.map(p=>[...p])),holes:(sh.holes||[]).map(r=>r.map(p=>[...p]))};
+  RESULT=null;SRES=null;markPreset();renderAll();if(isStrip())renderStrip();
+  if(run!==false)compute();
+}
+
+/* ---------------- computation (Web Worker; falls back to main thread) ---------------- */
+const WORKER_MAIN=`
+self.onmessage=e=>{const m=e.data;
+  if(m.mode==='strip'){try{const r=OriVers.stripMethod(m.T,m.holes,m.opt);self.postMessage({type:'sdone',result:r});}catch(err){self.postMessage({type:'error',message:String(err&&err.stack||err)});}return;}
+  try{
+    const r=OriVers.solveShape(m.T,m.holes,{cap:true,paper:m.paper,maxCandidates:m.maxC,foldIn:m.foldIn,onProgress:x=>self.postMessage({type:'progress',entry:x})});
+    self.postMessage({type:'done',result:pack(r)});
+  }catch(err){self.postMessage({type:'error',message:String(err&&err.stack||err)});}
+};
+function pack(r){
+  if(!r.ok)return {ok:false,log:r.log,tried:r.tried,ms:r.ms};
+  const M=r.model;
+  return {ok:true,paperKindUsed:r.paperKindUsed,foldin:r.foldin,log:r.log,tried:r.tried,ms:r.ms,cand:r.cand,P:r.P,creases:r.creases,check:r.check,maekawa:r.maekawa,
+    violated:r.violated,info:M.info,capInfo:M.capInfo,nStrong:M.nStrong,n:M.n,W:M.W,ovPairs:M.ovPairs,
+    edges:M.edges.map(e=>({a:e.a,b:e.b,kind:e.kind,pa:e.pa,pb:e.pb})),
+    pieces:M.pieces.map(p=>({poly:p.poly,cov:p.cov,top:p.top,inT:p.inT,tiny:p.tiny,area:p.area}))};
+}`;
+function makeWorker(){
+  try{
+    const src=$('ov-lib').textContent+'\n'+WORKER_MAIN;
+    const url=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));
+    return new Worker(url);
+  }catch(e){return null;}
+}
+function logLine(s){const p=$('progress');p.textContent+=s+'\n';p.scrollTop=p.scrollHeight;}
+function fmtEntry(x){return `候補 #${x.k}${x.protrusion!=null&&isFinite(x.protrusion)?`（折り込み後のはみ出し≈${(100*x.protrusion).toFixed(1)}%）`:''}  φ=${x.phase} seed=${x.seed}  面 ${x.n}  変数 ${x.vars}  節 ${x.clauses}  → ${x.status==='sat'?'SAT':x.status==='unsat'?'UNSAT':x.status}  (${Math.round(x.ms)} ms)`;}
+function compute(){
+  if(isStrip()){computeStrip();return;}
+  if(WORKER){WORKER.terminate();WORKER=null;}
+  const paper=$('paperkind').value;
+  const maxC=Math.max(1,Math.min(60,+$('maxc').value||20));
+  $('progress').textContent='';
+  RUNNING=true;RESULT=null;renderAll();
+  logLine(`開始: ${SHAPE.name}  紙=${paper}  候補≤${maxC}`);
+  const msg={T:SHAPE.T,holes:SHAPE.holes,paper,maxC,foldIn:$('foldin').checked};
+  const finish=res=>{RUNNING=false;RESULT=res;if(res.ok){res.paperKind=res.paperKindUsed||paper;res.shapeName=SHAPE.name;}
+    logLine(res.ok?`完了: 候補 #${res.cand.index} で SAT（${res.tried} 個試行, 計 ${Math.round(res.ms)} ms）`:`失敗: ${res.tried} 個の候補すべて UNSAT`);
+    if(res.ok&&res.foldin)logLine(res.foldin.ok?`凸包へ折り込み: ${res.foldin.rounds+1} 周、再認証 OK（違反節 0、最大層数 ${res.foldin.maxLayersBefore} → ${res.check.max_layers}）`:`凸包へ折り込み: 再認証に失敗したため、折り込み前の結果を表示します`);
+    renderAll();
+    if(window.matchMedia('(max-width:820px)').matches)document.querySelector('main').scrollIntoView({behavior:'smooth'});};
+  WORKER=makeWorker();
+  if(WORKER){
+    WORKER.onmessage=e=>{const m=e.data;
+      if(m.type==='progress')logLine(fmtEntry(m.entry));
+      else if(m.type==='done'){WORKER.terminate();WORKER=null;finish(m.result);}
+      else if(m.type==='error'){WORKER.terminate();WORKER=null;RUNNING=false;logLine('エラー: '+m.message);renderAll();}
+    };
+    WORKER.onerror=e=>{logLine('Worker が使えないため本体で計算します');WORKER=null;runMain(msg,finish);};
+    WORKER.postMessage(msg);
+  }else runMain(msg,finish);
+  renderAll();
+}
+function runMain(m,finish){
+  setTimeout(()=>{
+    try{
+      const r=OriVers.solveShape(m.T,m.holes,{cap:true,paper:m.paper,maxCandidates:m.maxC,foldIn:m.foldIn,onProgress:x=>logLine(fmtEntry(x))});
+      if(!r.ok){finish({ok:false,log:r.log,tried:r.tried,ms:r.ms});return;}
+      const M=r.model;
+      finish({ok:true,paperKindUsed:r.paperKindUsed,foldin:r.foldin,log:r.log,tried:r.tried,ms:r.ms,cand:r.cand,P:r.P,creases:r.creases,check:r.check,maekawa:r.maekawa,
+        violated:r.violated,info:M.info,capInfo:M.capInfo,nStrong:M.nStrong,n:M.n,W:M.W,ovPairs:M.ovPairs,edges:M.edges,pieces:M.pieces});
+    }catch(e){RUNNING=false;logLine('エラー: '+e.message);renderAll();}
+  },30);
+}
+$('run').onclick=compute;
+$('tores').onclick=()=>document.querySelector('main').scrollIntoView({behavior:'smooth'});
+$('foldin').onchange=compute;
+$('paperkind').onchange=()=>{if($('paperkind').value==='legacy'&&+$('maxc').value===20)$('maxc').value=40;else if($('paperkind').value!=='legacy'&&+$('maxc').value===40)$('maxc').value=20;compute();};
+
+/* ---------------- rendering ---------------- */
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function fitBox(pts,pad){
+  let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;
+  for(const p of pts){a=Math.min(a,p[0]);b=Math.min(b,p[1]);c=Math.max(c,p[0]);d=Math.max(d,p[1]);}
+  const s=Math.max(c-a,d-b)*(1+2*pad),cx=(a+c)/2,cy=(b+d)/2;
+  return {x0:cx-s/2,y0:cy-s/2,s,tf:p=>[(p[0]-(cx-s/2))/s,1-(p[1]-(cy-s/2))/s]};
+}
+function renderTarget(){
+  const svg=$('v-target');svg.innerHTML='';
+  const tf=p=>[p[0]*0.9+0.05,1-(p[1]*0.9+0.05)];
+  const g=css('--grid');
+  for(let k=0;k<=10;k++){const t=0.05+0.09*k;
+    el('line',{x1:0.05,y1:t,x2:0.95,y2:t,stroke:g,'stroke-width':0.002},svg);el('line',{x1:t,y1:0.05,x2:t,y2:0.95,stroke:g,'stroke-width':0.002},svg);}
+  el('rect',{x:0.05,y:0.05,width:0.9,height:0.9,fill:'none',stroke:css('--line'),'stroke-width':0.003},svg);
+  el('path',{d:pathOf([...SHAPE.T,...SHAPE.holes],tf),fill:'#2E5A87','fill-opacity':0.85,'fill-rule':'evenodd',stroke:'#2E5A87','stroke-width':0.004,'stroke-linejoin':'round'},svg);
+  const nv=SHAPE.T.reduce((s,r)=>s+r.length,0)+SHAPE.holes.reduce((s,r)=>s+r.length,0);
+  $('cap-a').textContent=`${NAMES[SHAPE.name]||SHAPE.name}：成分 ${SHAPE.T.length}・穴 ${SHAPE.holes.length}・頂点 ${nv}。[0,1]² 上の多角形。`;
+}
+function renderCP(){
+  const svg=$('v-cp');svg.innerHTML='';
+  if(!RESULT||!RESULT.ok){if(RUNNING)placeholder(svg,'計算中…');return;}
+  const R=RESULT,paper=R.cand.paper;
+  const fb=fitBox(paper,0.03),tf=fb.tf,sw=1/fb.s;
+  el('path',{d:pathOf([paper],tf),fill:css('--panel'),stroke:css('--ink'),'stroke-width':0.004},svg);
+  if($('t-flat').checked)for(const e of R.edges)if(e.kind==='flat'){const A=tf(e.pa),B=tf(e.pb);
+    el('line',{x1:A[0],y1:A[1],x2:B[0],y2:B[1],stroke:css('--muted'),'stroke-opacity':0.45,'stroke-width':0.0015},svg);}
+  const mc=css('--mount'),vc=css('--valley');
+  for(const c of R.creases){const A=tf(c.a),B=tf(c.b);
+    el('line',{x1:A[0],y1:A[1],x2:B[0],y2:B[1],stroke:c.mv==='M'?mc:vc,'stroke-width':0.003,
+      'stroke-dasharray':c.mv==='V'?'0.012 0.007':'none','stroke-linecap':'round'},svg);}
+  for(const p of R.maekawa.badPts){const q=tf(p);el('circle',{cx:q[0],cy:q[1],r:0.012,fill:'none',stroke:css('--bad'),'stroke-width':0.004},svg);}
+  const nM=R.creases.filter(c=>c.mv==='M').length;
+  $('cap-b').textContent=`紙の${{square:'正方形',legacy:'正方形',tri:'正三角形',hex:'正六角形',auto:'正方形'}[R.paperKind]}（一辺 ${R.W.toFixed(4)}）。山 ${nM}・谷 ${R.creases.length-nM}。山谷は層順序から決定（上の面が裏向き ⇔ 谷）。`;
+}
+function renderFold(){
+  const svg=$('v-fold');svg.innerHTML='';
+  if(!RESULT||!RESULT.ok){if(RUNNING)placeholder(svg,'計算中…');return;}
+  const R=RESULT,s=R.cand.faces.map(f=>f.s);
+  const pts=[];for(const p of R.pieces)for(const q of p.poly)pts.push(q);
+  for(const t of SHAPE.T)for(const q of t)pts.push(q);
+  const fb=fitBox(pts,0.03),tf=fb.tf;
+  let dF='',dB='';
+  for(const p of R.pieces){const d=pathOf([p.poly],tf);if(s[p.top]<0)dB+=d;else dF+=d;}
+  el('path',{d:dF,fill:'#F4EBDD',stroke:'#F4EBDD','stroke-width':0.0012,'stroke-linejoin':'round'},svg);
+  el('path',{d:dB,fill:'#2E5A87',stroke:'#2E5A87','stroke-width':0.0012,'stroke-linejoin':'round'},svg);
+  if($('t-edges').checked)for(const f of R.cand.faces)
+    el('path',{d:pathOf([f.F],tf),fill:'none',stroke:'#7a6a55','stroke-opacity':0.35,'stroke-width':0.0012},svg);
+  el('path',{d:pathOf([...SHAPE.T,...SHAPE.holes],tf),fill:'none',stroke:'#c9873a','stroke-width':0.004,'stroke-dasharray':'0.012 0.008'},svg);
+}
+function placeholder(svg,t){const x=el('text',{x:0.5,y:0.5,'text-anchor':'middle','font-size':0.045,fill:css('--muted')},svg);x.textContent=t;}
+function renderStats(){
+  const tb=$('stats').tBodies[0];tb.innerHTML='';
+  const row=(k,v,cls)=>{const tr=document.createElement('tr');const a=document.createElement('td');a.textContent=k;const b=document.createElement('td');b.innerHTML=v;if(cls)b.className=cls;tr.append(a,b);tb.appendChild(tr);};
+  const vd=$('verdict');vd.hidden=true;
+  if(RUNNING){row('状態','計算中…（左の進捗を参照）');return;}
+  if(!RESULT){row('状態','「計算する」を押してください');return;}
+  if(!RESULT.ok){row('状態',`<span class="bad">失敗</span>：${RESULT.tried} 個の候補すべてで層順序が存在しません（UNSAT）`);return;}
+  const R=RESULT,I=R.info,C=R.check,MK=R.maekawa;
+  const nFold=R.creases.length,nM=R.creases.filter(c=>c.mv==='M').length;
+  row('紙の一辺 W',R.W.toFixed(5));
+  row('面（三角形）',R.n);
+  row('折線（山／谷）',`${nFold}（${nM}／${nFold-nM}）`);
+  row('試した候補',`${R.tried}（採用 #${R.cand.index}、φ=${R.cand.phase}, seed=${R.cand.seed}）`);
+  row('SAT 変数／節',`${I.vars.toLocaleString()}／${I.clauses.toLocaleString()}`);
+  row('内訳','推移律 '+I.triples+' 組・taco–taco '+I.taco_taco+'・taco–tortilla '+I.taco_tortilla);
+  if(R.capInfo)row('袋モデル',`輪郭の辺 ${R.capInfo.dAtoms}・ジップ対 ${R.capInfo.zips}・強キャップ単位節 ${R.nStrong}`);
+  row('セル（被覆集合）',`${I.cells}（凸片 ${I.pieces}）`);
+  row('最大層数',C.max_layers);
+  const back=C.back_on_top;
+  row('T 上で裏面が最上層',(back*100).toFixed(4)+' %',back>=1-1e-12?'ok':'bad');
+  row('T の被覆',`${(C.T_area_cells/C.T_area*100).toFixed(4)} %`, Math.abs(C.T_area_cells/C.T_area-1)<1e-6?'ok':'bad');
+  row('T の外の色の面積',(C.back_out||0).toExponential(2)+`（外の白い紙 ${(C.out_area||0).toFixed(4)}）`,(C.back_out||0)===0?'ok':'bad');
+  row('全順序でないセル',C.not_total,C.not_total===0?'ok':'bad');
+  row('違反節（解の再評価）',R.violated,R.violated===0?'ok':'bad');
+  row('前川 |M−V|=2（内部頂点）',`${MK.interior-MK.bad}／${MK.interior}`,MK.bad===0?'ok':'bad');
+  row('計算時間',`${Math.round(R.ms)} ms（最終候補: 構築 ${Math.round(R.log[R.log.length-1].ms_build)} ms）`);
+  const good=back>=1-1e-12&&C.not_total===0&&R.violated===0&&MK.bad===0&&!(C.back_out>0);
+  vd.hidden=false;vd.innerHTML=good?'<span class="ok">✓ インサイドアウト実現</span>：Justin の条件と袋モデル（輪郭の縁が最上・ジップ）を満たす層順序が存在します。T 全体で裏面が最上層、T の外に色は出ず、輪郭は紙の生の縁です。'
+    :'<span class="bad">要確認</span>：上の赤字の項目を確認してください。';
+}
+function renderAll(){
+  renderTarget();renderCP();renderFold();renderStats();
+  for(const id of ['x-cpsvg','x-cp','x-fold','x-json'])$(id).disabled=!(RESULT&&RESULT.ok);
+  $('run').disabled=false;$('run').textContent=RUNNING?'再計算':'計算する';
+}
+$('t-flat').onchange=renderCP;$('t-edges').onchange=renderFold;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',renderAll);
+$('themebtn').addEventListener('click',()=>setTimeout(renderAll,0));
+
+/* ---------------- strip method (帯の方法) ---------------- */
+let SRES=null,SRUNNING=false;
+function isStrip(){return $('mode').value==='strip';}
+function applyMode(){const st=isStrip();$('strip-opts').hidden=!st;$('dk-opts').hidden=st;
+  document.querySelectorAll('.sview').forEach(e=>e.hidden=!st);document.querySelectorAll('.dkview').forEach(e=>e.hidden=st);
+  if(st)renderStrip();}
+$('mode').onchange=()=>{applyMode();if(isStrip()&&!SRES&&!SRUNNING)computeStrip();};
+function computeStrip(){
+  if(WORKER){WORKER.terminate();WORKER=null;}
+  $('progress').textContent='';SRUNNING=true;SRES=null;renderStrip();
+  const opt={w:+$('st-w').value||3,trials:Math.max(1,+$('st-trials').value||24),maxRows:Math.max(10,+$('st-max').value||1500),gap:6,close:true,skipI:true,randLines:true};
+  logLine(`帯の方法: ${SHAPE.name}  w=${opt.w}  試行 ${opt.trials}  行の上限 ${opt.maxRows}`);
+  const msg={mode:'strip',T:SHAPE.T,holes:SHAPE.holes,opt};
+  const fin=r=>{SRUNNING=false;SRES=r;SRES.shapeName=SHAPE.name;for(const l of r.log||[])logLine(l);
+    if(r.tooBig)logLine(`行の数 ${r.nRows} が上限を超えたため、分解だけを表示します（上限を上げると全体を計算）`);else logLine('完了');renderStrip();};
+  const fail=e=>{SRUNNING=false;logLine('エラー: '+e);renderStrip();};
+  WORKER=makeWorker();
+  if(WORKER){WORKER.onmessage=e=>{const m=e.data;if(m.type==='sdone'){WORKER.terminate();WORKER=null;fin(m.result);}else if(m.type==='error'){WORKER.terminate();WORKER=null;fail(m.message);}};
+    WORKER.onerror=()=>{WORKER=null;setTimeout(()=>{try{fin(OriVers.stripMethod(msg.T,msg.holes,opt));}catch(e){fail(e.message);}},30);};
+    WORKER.postMessage(msg);}
+  else setTimeout(()=>{try{fin(OriVers.stripMethod(msg.T,msg.holes,opt));}catch(e){fail(e.message);}},30);
+}
+$('st-run').onclick=computeStrip;
+$('st-square').onchange=()=>renderSquare();
+$('t-phi').onchange=()=>renderSFold();
+function cvPrep(cv,aspect){const r=cv.getBoundingClientRect();const W=Math.max(200,r.width||400);const H=W*(aspect||1);
+  cv.style.aspectRatio=(1/(aspect||1)).toString();const dpr=Math.min(2,window.devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);c.fillStyle=css('--panel');c.fillRect(0,0,W,H);return {c,W,H};}
+function cvFit(pts,W,H,pad){let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;for(const p of pts){a=Math.min(a,p[0]);b=Math.min(b,p[1]);c=Math.max(c,p[0]);d=Math.max(d,p[1]);}
+  const s=Math.min(W/(c-a||1),H/(d-b||1))*(1-2*(pad||0.03));const ox=(W-s*(c-a))/2,oy=(H-s*(d-b))/2;return {s,tf:p=>[ox+(p[0]-a)*s,H-(oy+(p[1]-b)*s)]};}
+function cvPoly(c,P,tf){c.beginPath();P.forEach((p,i)=>{const q=tf(p);if(i)c.lineTo(q[0],q[1]);else c.moveTo(q[0],q[1]);});c.closePath();}
+function cvMsg(cv,t){const {c,W,H}=cvPrep(cv);c.fillStyle=css('--muted');c.font='14px system-ui';c.textAlign='center';c.fillText(t,W/2,H/2);}
+function renderStrip(){renderSBase();renderSStrip();renderSFold();renderSquare();renderSStats();}
+function renderSBase(){const cv=$('c-base');if(!SRES){cvMsg(cv,SRUNNING?'計算中…':'「帯の方法で計算」を押してください');return;}
+  const R=SRES,{c,W,H}=cvPrep(cv);const pts=R.pieces.flatMap(p=>p.poly);const {tf}=cvFit(pts,W,H);
+  c.fillStyle='#cfdcea';c.strokeStyle='#4d6f93';c.lineWidth=0.6;for(const P of R.pieces){cvPoly(c,P.poly,tf);c.fill();c.stroke();}
+  c.strokeStyle='#7d8a96';c.lineWidth=0.4;for(const P of R.rows){cvPoly(c,P,tf);c.stroke();}
+  c.strokeStyle='#c9873a';c.lineWidth=2.2;for(const P of R.pieces)for(const [a,b] of P.owned){const A=tf(a),B=tf(b);c.beginPath();c.moveTo(A[0],A[1]);c.lineTo(B[0],B[1]);c.stroke();}
+  c.strokeStyle='#9a6fb0';c.lineWidth=0.7;for(const path of (R.ropes||[])){c.beginPath();path.forEach((p,i)=>{const q=tf(p);if(i)c.lineTo(q[0],q[1]);else c.moveTo(q[0],q[1]);});c.stroke();}
+  $('cap-e').textContent=`開き ${R.nOpen}（(0) ${R.info.step0}・(i) ${R.info.stepi}・(ii) ${R.info.stepii}）、片 ${R.pieces.length}、行 ${R.nRows}、尺度 λ = ${R.lam.toFixed(2)}、回転 ${(R.angle*180/Math.PI).toFixed(1)}°。開いた後の配置（λ 倍）。`;}
+function wrapStrip(segs,L){ // wrap the long strip into lines
+  const n=Math.max(1,Math.round(Math.sqrt(L/2.6)));const len=L/n,gap=0.6;const out=[];
+  for(const [x1,y1,x2,y2,mv] of segs){const lo=Math.min(x1,x2),hi=Math.max(x1,x2);
+    for(let k=Math.max(0,Math.floor(lo/len));k<=Math.min(n-1,Math.floor(hi/len));k++){const a=k*len,b=(k+1)*len;
+      let t0=0,t1=1;if(Math.abs(x2-x1)>1e-12){const ta=(a-x1)/(x2-x1),tb=(b-x1)/(x2-x1);t0=Math.max(0,Math.min(ta,tb));t1=Math.min(1,Math.max(ta,tb));}
+      if(t1<t0)continue;const P=t=>[x1+t*(x2-x1)-a,y1+t*(y2-y1)-k*(1+gap)];out.push([P(t0),P(t1),mv]);}}
+  const frames=[];for(let k=0;k<n;k++)frames.push([[0,-k*(1+gap)],[len,-k*(1+gap)],[len,1-k*(1+gap)],[0,1-k*(1+gap)]]);return {out,frames,n,len};}
+function renderSStrip(){const cv=$('c-strip');if(!SRES||!SRES.stripCP){cvMsg(cv,SRUNNING?'計算中…':(SRES&&SRES.tooBig?'行が多すぎるため省略':'—'));return;}
+  const R=SRES;const segs=R.closedCP||R.stripCP;const w=wrapStrip(segs,R.L);const {c,W,H}=cvPrep(cv,0.75);const {tf}=cvFit(w.frames.flat(),W,H,0.02);
+  c.fillStyle='#fbf8f2';c.strokeStyle=css('--ink');c.lineWidth=0.6;for(const F of w.frames){cvPoly(c,F,tf);c.fill();c.stroke();}
+  c.lineWidth=0.5;for(const want of [1,2]){c.strokeStyle=want===1?css('--mount'):css('--valley');c.beginPath();
+    for(const [a,b,mv] of w.out){if(mv!==want)continue;const A=tf(a),B=tf(b);c.moveTo(A[0],A[1]);c.lineTo(B[0],B[1]);}c.stroke();}
+  const nM=segs.filter(x=>x[4]===1).length;
+  $('cap-f').textContent=`帯 [0, ${R.L}] × [0, 1] を ${w.n} 段に折り返して表示（左上から）。折線 ${segs.length}（山 ${nM}・谷 ${segs.length-nM}）。面 ${R.nClosed||R.nStripFaces}。`;}
+function renderSFold(){const cv=$('c-fold');if(!SRES||!SRES.folded){cvMsg(cv,SRUNNING?'計算中…':(SRES&&SRES.tooBig?'行が多すぎるため省略':'—'));return;}
+  const R=SRES,phi=$('t-phi').checked;const F=phi?R.phiImage:R.folded;const {c,W,H}=cvPrep(cv);
+  const pts=phi?F.flatMap(f=>f[0]):R.T.flat();const {tf}=cvFit(pts,W,H,phi?0.02:0.08);
+  for(const [P,col] of F){c.fillStyle=col?'#2E5A87':'#F4EBDD';c.strokeStyle=c.fillStyle;c.lineWidth=0.3;cvPoly(c,P,tf);c.fill();c.stroke();}
+  c.strokeStyle='#c9873a';c.lineWidth=1.4;c.setLineDash([5,4]);
+  const rings=phi?R.pieces.map(p=>p.poly):R.T.concat(R.H);for(const P of rings){cvPoly(c,P,tf);c.stroke();}c.setLineDash([]);
+  $('cap-g').textContent=phi?`閉じる前の帯の状態 Φ（基底の配置の、壁に持ち主を要求しない実現）。点線は片。`:`閉じた後の帯の状態（λ 倍・回転した T の実現）。面 ${R.nClosed} を層順序の下から順に描画。点線は ∂T。`;}
+function renderSquare(){const cv=$('c-square');if(!$('st-square').checked){cvMsg(cv,'（オフ）');$('cap-h').textContent='左の「正方形の展開図も描く」をオンにすると描画します。';return;}
+  if(!SRES||!SRES.closedCP){cvMsg(cv,SRUNNING?'計算中…':'—');return;}
+  const R=SRES;const LIM=1500000;const sq=OriVers.strip.squareCP(R.closedCP,R.m,LIM);const {c,W,H}=cvPrep(cv);const L=sq.L;const s=Math.min(W,H)/L*0.97,o=(W-s*L)/2;
+  const tf=p=>[o+p[0]*s,H-(o+p[1]*s)];c.fillStyle='#fbf8f2';c.fillRect(o,o,L*s,L*s);c.lineWidth=0.4;
+  for(const want of [1,2]){c.strokeStyle=want===1?css('--mount'):css('--valley');c.beginPath();
+    for(const [x1,y1,x2,y2,mv] of sq.segs){if(mv!==want)continue;c.moveTo(o+x1*s,H-(o+y1*s));c.lineTo(o+x2*s,H-(o+y2*s));}c.stroke();}
+  c.strokeStyle=css('--ink');c.strokeRect(o,o,L*s,L*s);
+  $('cap-h').textContent=`一辺 ${L} = 2·${R.m}+1 の正方形。帯の展開図を ${L} 層に引き戻し（奇数層は鏡映・山谷反転）、蛇腹の折線 y = k を加えたもの。線分 ${sq.segs.length.toLocaleString()}${sq.truncated?'（上限で打ち切り）':''}。`;}
+function renderSStats(){const tb=$('sstats').tBodies[0];tb.innerHTML='';const row=(k,v)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${k}</td><td>${v}</td>`;tb.appendChild(tr);};
+  if(SRUNNING){row('状態','計算中…');return;}if(!SRES){row('状態','—');return;}const R=SRES;
+  row('開きの数',`${R.nOpen}（(0) ${R.info.step0}、(i) ${R.info.stepi}、(ii) ${R.info.stepii}、(ii) 省略 ${R.info.stepiiSkipped}）`);
+  row('片／行',`${R.pieces.length}／${R.nRows}`);row('尺度 λ',R.lam.toFixed(3));
+  if(R.tooBig){row('状態','行の数が上限を超えたため分解のみ');return;}
+  row('帯の長さ L',`${R.L} = 2·${R.m}+1`);row('帯の状態 Φ の面',R.nStripFaces);row('閉じた後の面',R.nClosed);
+  row('綱の経路',`${R.stats.routes} 本、曲がり ${R.stats.turns}、偶奇の調整 ${R.stats.parityFix}、折線の間隔の問題 ${R.stats.crease}`);
+  row('経路の条件（他の片・行に入る面）',`${R.stats.routeViolations}`);
+  if(R.sample)row('閉じた後の標本検査',`${R.sample.n} 点：n ≠ χ_T ${R.sample.badN}、最上層の色の違反 ${R.sample.badTop}、最下層が色 ${R.sample.badBot}（層順序の全条件の検証は checker/indep_check.py）`);
+  row('正方形',`一辺 ${R.L}、面 ≈ ${(R.nClosed*R.L).toLocaleString()}（${R.L} 層）`);
+  row('計算時間',`構築 ${R.ms.build} ms・閉じる ${R.ms.close} ms・展開図 ${(R.ms.cp||0)+(R.ms.cp2||0)} ms`);}
+/* ---------------- exports ---------------- */
+let DL=null; try{ if(window.claude&&window.claude.use) window.claude.use('downloads').then(d=>{DL=d;}).catch(()=>{}); }catch(e){}
+function download(txt,name,mime){
+  if(DL){
+    // the artifact viewer only accepts listed extensions: ORIPA .cp is saved as .cp.txt (rename after saving)
+    const fn=/\.(svg|json|txt)$/.test(name)?name:name+'.txt';
+    DL.save({filename:fn,data:new Blob([txt],{type:mime||'text/plain'})}).catch(e=>{
+      const m=$('progress'); if(m&&e&&e.code!=='declined') m.textContent+='保存できませんでした（'+(e.code||'error')+'）\n';});
+    return;
+  }
+  const blob=new Blob([txt],{type:mime||'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+}
+function baseName(){return 'orivers_'+(RESULT.shapeName||'shape')+'_'+RESULT.paperKind;}
+function sheetMM(){const v=parseFloat($('sheet').value);return isFinite(v)&&v>0?v:150;}
+function paperFrame(scale){
+  // paper coordinates -> output coordinates: bbox of paper scaled so its larger side = scale, y downward
+  const P=RESULT.cand.paper;let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;
+  for(const p of P){a=Math.min(a,p[0]);b=Math.min(b,p[1]);c=Math.max(c,p[0]);d=Math.max(d,p[1]);}
+  const k=scale/Math.max(c-a,d-b);
+  return {w:(c-a)*k,h:(d-b)*k,tf:p=>[(p[0]-a)*k,(d-p[1])*k],k};
+}
+function exportCPSVG(){
+  const S=sheetMM(),fr=paperFrame(S),f=x=>(+x).toFixed(6);
+  const sw=(S/400).toFixed(4);
+  const L=['<?xml version="1.0" encoding="UTF-8"?>',
+    `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="${f(fr.w)}mm" height="${f(fr.h)}mm" viewBox="0 0 ${f(fr.w)} ${f(fr.h)}">`];
+  const line=(A,B,col)=>{const p=fr.tf(A),q=fr.tf(B);L.push(`<line x1="${f(p[0])}" y1="${f(p[1])}" x2="${f(q[0])}" y2="${f(q[1])}" stroke="${col}" stroke-width="${sw}"/>`);};
+  const P=RESULT.cand.paper;
+  for(let i=0;i<P.length;i++)line(P[i],P[(i+1)%P.length],'rgb(0,0,0)');
+  for(const c of RESULT.creases)line(c.a,c.b,c.mv==='M'?'rgb(255,0,0)':'rgb(0,0,255)');
+  L.push('</svg>');
+  download(L.join('\n')+'\n',baseName()+'_cp.svg','image/svg+xml');
+}
+function exportCP(){
+  // ORIPA .cp: "type x1 y1 x2 y2", 1=cut/border 2=mountain 3=valley; paper centred at origin, larger side 400, y down
+  const fr=paperFrame(400),f=x=>(+x).toFixed(6);
+  const t=p=>{const q=fr.tf(p);return [q[0]-fr.w/2,q[1]-fr.h/2];};
+  const out=[];const P=RESULT.cand.paper;
+  const ln=(ty,A,B)=>{const p=t(A),q=t(B);out.push(`${ty} ${f(p[0])} ${f(p[1])} ${f(q[0])} ${f(q[1])}`);};
+  for(let i=0;i<P.length;i++)ln(1,P[i],P[(i+1)%P.length]);
+  for(const c of RESULT.creases)ln(c.mv==='M'?2:3,c.a,c.b);
+  download(out.join('\n')+'\n',baseName()+'.cp','text/plain');
+}
+function exportFold(){
+  const R=RESULT,s=R.cand.faces.map(x=>x.s);
+  const pts=[];for(const p of R.pieces)for(const q of p.poly)pts.push(q);
+  const fb=fitBox(pts,0.03),S=800,tf=p=>{const q=fb.tf(p);return [q[0]*S,q[1]*S];};
+  const d=(rings)=>rings.map(r=>'M'+r.map(p=>{const q=tf(p);return q[0].toFixed(3)+' '+q[1].toFixed(3);}).join(' L')+' Z').join(' ');
+  const F=R.pieces.filter(p=>s[p.top]>0).map(p=>p.poly),B=R.pieces.filter(p=>s[p.top]<0).map(p=>p.poly);
+  const L=['<?xml version="1.0" encoding="UTF-8"?>',`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">`,
+    `<desc>OriVers folded state (top view, exact layer order). front=#F4EBDD back=#2E5A87; dashed = boundary of T</desc>`,
+    `<path d="${d(F)}" fill="#F4EBDD" stroke="#F4EBDD" stroke-width="0.6" stroke-linejoin="round"/>`,
+    `<path d="${d(B)}" fill="#2E5A87" stroke="#2E5A87" stroke-width="0.6" stroke-linejoin="round"/>`,
+    `<path d="${d([...SHAPE.T,...SHAPE.holes])}" fill="none" stroke="#c9873a" stroke-width="2.5" stroke-dasharray="9 6"/>`,'</svg>'];
+  download(L.join('\n')+'\n',baseName()+'_folded.svg','image/svg+xml');
+}
+function exportJSON(){
+  const R=RESULT,n=R.n;
+  const above=[];for(const [i,j] of R.ovPairs)above.push(R.P[i*n+j]?[i,j]:[j,i]);
+  // per-cell stacking (top first) for every distinct covering set
+  const cells=new Map();
+  for(const p of R.pieces){if(p.tiny)continue;const k=p.cov.join(',');if(cells.has(k))continue;
+    const st=[...p.cov].sort((x,y)=>p.cov.reduce((t,g)=>t+R.P[y*n+g],0)-p.cov.reduce((t,g)=>t+R.P[x*n+g],0));
+    cells.set(k,{stack:st,inT:!!p.inT});}
+  const out={format:'orivers-layer-1',shape:R.shapeName,paperKind:R.paperKind,W:R.W,paper:R.cand.paper,T:SHAPE.T,holes:SHAPE.holes,
+    candidate:{index:R.cand.index,phase:R.cand.phase,seed:R.cand.seed,tried:R.tried},
+    faces:R.cand.faces,
+    above_pairs:above, note:'above_pairs[k]=[i,j]: face i lies above face j (front side = +z, s=+1 means front-up). P is the full n×n matrix (row-major).',
+    P:Array.from(R.P),cells:[...cells.values()],
+    creases:R.creases.map(c=>({a:c.a,b:c.b,mv:c.mv,faces:[c.f0,c.f1]})),
+    stats:{...R.info,check:R.check,maekawa:{interior:R.maekawa.interior,bad:R.maekawa.bad},violated:R.violated,ms:R.ms}};
+  download(JSON.stringify(out),baseName()+'.json','application/json');
+}
+$('x-cpsvg').onclick=exportCPSVG;$('x-cp').onclick=exportCP;$('x-fold').onclick=exportFold;$('x-json').onclick=exportJSON;
+
+/* ---------------- polygon editor ---------------- */
+const ED={polys:[],cur:[],hover:null};   // polys: {pts, hole}
+function edPt(ev){
+  const svg=$('ed-svg');const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;
+  const q=pt.matrixTransform(svg.getScreenCTM().inverse());
+  let x=q.x,y=1-q.y;
+  if($('ed-snap').checked){x=Math.round(x*20)/20;y=Math.round(y*20)/20;}
+  return [Math.min(1,Math.max(0,x)),Math.min(1,Math.max(0,y))];
+}
+function drawEditor(){
+  const svg=$('ed-svg');svg.innerHTML='';
+  const g=css('--grid');
+  for(let k=0;k<=20;k++){const t=k/20;el('line',{x1:0,y1:t,x2:1,y2:t,stroke:g,'stroke-width':k%5?0.0015:0.003},svg);el('line',{x1:t,y1:0,x2:t,y2:1,stroke:g,'stroke-width':k%5?0.0015:0.003},svg);}
+  el('rect',{x:0,y:0,width:1,height:1,fill:'none',stroke:css('--line'),'stroke-width':0.004},svg);
+  const tf=p=>[p[0],1-p[1]];
+  const Ts=ED.polys.filter(p=>!p.hole).map(p=>p.pts),Hs=ED.polys.filter(p=>p.hole).map(p=>p.pts);
+  if(Ts.length)el('path',{d:pathOf([...Ts,...Hs],tf),fill:'#2E5A87','fill-opacity':0.6,'fill-rule':'evenodd',stroke:'#2E5A87','stroke-width':0.004},svg);
+  for(const H of Hs)el('path',{d:pathOf([H],tf),fill:'none',stroke:'#c9873a','stroke-width':0.004,'stroke-dasharray':'0.015 0.01'},svg);
+  if(ED.cur.length){
+    const pts=[...ED.cur,...(ED.hover?[ED.hover]:[])].map(tf);
+    el('polyline',{points:pts.map(p=>p.join(',')).join(' '),fill:'none',stroke:css('--mount'),'stroke-width':0.005},svg);
+    ED.cur.forEach((p,i)=>{const q=tf(p);el('circle',{cx:q[0],cy:q[1],r:i?0.008:0.013,fill:css('--mount')},svg);});
+  }
+}
+$('ed-svg').addEventListener('click',ev=>{
+  const p=edPt(ev);
+  if(ED.cur.length>=3&&Math.hypot(p[0]-ED.cur[0][0],p[1]-ED.cur[0][1])<0.02){edClose(false);return;}
+  const l=ED.cur[ED.cur.length-1];if(l&&l[0]===p[0]&&l[1]===p[1])return;
+  ED.cur.push(p);drawEditor();
+});
+$('ed-svg').addEventListener('mousemove',ev=>{ED.hover=edPt(ev);if(ED.cur.length)drawEditor();});
+$('ed-svg').addEventListener('mouseleave',()=>{ED.hover=null;drawEditor();});
+function edMsg(t,bad){const m=$('ed-msg');m.textContent=t;m.style.color=bad?css('--bad'):'';}
+function segX(a,b,c,d){const o=(p,q,r)=>Math.sign((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]));
+  return o(a,b,c)*o(a,b,d)<0&&o(c,d,a)*o(c,d,b)<0;}
+function simple(P){const n=P.length;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){if(Math.abs(i-j)<=1||(i===0&&j===n-1))continue;if(segX(P[i],P[(i+1)%n],P[j],P[(j+1)%n]))return false;}return true;}
+function crossesAny(P,Q){for(let i=0;i<P.length;i++)for(let j=0;j<Q.length;j++)if(segX(P[i],P[(i+1)%P.length],Q[j],Q[(j+1)%Q.length]))return true;return false;}
+function edClose(hole){
+  if(ED.cur.length<3){edMsg('3点以上必要です',true);return;}
+  const P=ED.cur.slice();
+  const ar=OriVers.signedArea(P);
+  if(Math.abs(ar)<1e-4){edMsg('面積がほぼ 0 です',true);return;}
+  if(!simple(P)){edMsg('自己交差しています。点を戻して描き直してください',true);return;}
+  for(const q of ED.polys)if(crossesAny(P,q.pts)){edMsg('他の多角形と交差しています',true);return;}
+  ED.polys.push({pts:P,hole});ED.cur=[];edMsg(hole?'穴を追加しました':'外周を追加しました');drawEditor();
+}
+$('ed-closeT').onclick=()=>edClose(false);
+$('ed-closeH').onclick=()=>edClose(true);
+$('ed-undo').onclick=()=>{ED.cur.pop();drawEditor();};
+$('ed-delpoly').onclick=()=>{ED.polys.pop();drawEditor();};
+$('ed-clear').onclick=()=>{ED.polys=[];ED.cur=[];drawEditor();};
+$('ed-load').onclick=()=>{ED.polys=[...SHAPE.T.map(p=>({pts:p.map(q=>[...q]),hole:false})),...SHAPE.holes.map(p=>({pts:p.map(q=>[...q]),hole:true}))];ED.cur=[];drawEditor();};
+$('ed-use').onclick=()=>{
+  if(ED.cur.length)edClose(false);
+  const T=ED.polys.filter(p=>!p.hole).map(p=>p.pts),H=ED.polys.filter(p=>p.hole).map(p=>p.pts);
+  if(!T.length){edMsg('外周が1つ以上必要です',true);return;}
+  for(const h of H)if(!T.some(t=>ovInside(t,h[0]))){edMsg('穴がどの外周の内側にもありません',true);return;}
+  setShape({name:'custom',T,holes:H});
+};
+function ovInside(V,p){let c=false;for(let i=0,j=V.length-1;i<V.length;j=i++){const a=V[i],b=V[j];if(((a[1]>p[1])!==(b[1]>p[1]))&&(p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0]))c=!c;}return c;}
+$('ed-json').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
+  f.text().then(t=>{const d=JSON.parse(t);if(!Array.isArray(d.T))throw new Error('T がありません');
+    ED.polys=[...d.T.map(p=>({pts:p,hole:false})),...(d.holes||[]).map(p=>({pts:p,hole:true}))];ED.cur=[];drawEditor();edMsg('読み込みました（「この形を使う」で計算）');})
+   .catch(err=>edMsg('読み込み失敗: '+err.message,true));e.target.value='';};
+
+/* ---------------- image -> polygon (ported from the previous app) ---------------- */
+function imgToBinary(data,w,h,thresh,invert){
+  const bin=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++){
+    const a=data[i*4+3];if(a<128){bin[i]=0;continue;}
+    const lum=0.299*data[i*4]+0.587*data[i*4+1]+0.114*data[i*4+2];
+    let on=lum<thresh;if(invert)on=!on;bin[i]=on?1:0;
+  }
+  return bin;
+}
+function labelCC(bin,w,h,target){
+  const lab=new Int32Array(w*h);let n=0;const qx=new Int32Array(w*h),qy=new Int32Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;if(bin[i]!==target||lab[i])continue;
+    n++;let head=0,tail=0;qx[tail]=x;qy[tail]=y;tail++;lab[i]=n;
+    while(head<tail){const cx=qx[head],cy=qy[head];head++;
+      for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+d[0],ny=cy+d[1];
+        if(nx<0||ny<0||nx>=w||ny>=h)continue;const j=ny*w+nx;
+        if(bin[j]!==target||lab[j])continue;lab[j]=n;qx[tail]=nx;qy[tail]=ny;tail++;}}
+  }
+  return {lab,n};
+}
+function traceRegion(lab,w,h,id){
+  let sx=-1,sy=-1;
+  for(let y=0;y<h&&sy<0;y++)for(let x=0;x<w;x++)if(lab[y*w+x]===id){sx=x;sy=y;break;}
+  if(sx<0)return null;
+  const inside=(x,y)=>x>=0&&y>=0&&x<w&&y<h&&lab[y*w+x]===id;
+  const corner=(x,y,d)=>d===0?[x,y]:d===1?[x+1,y]:d===2?[x+1,y+1]:[x,y+1];
+  const pts=[];let px=sx,py=sy,dir=0,guard=0;const limit=8*w*h+1000;
+  do{
+    pts.push(corner(px,py,dir));
+    const f=[[1,0],[0,1],[-1,0],[0,-1]][dir];const l=[[0,-1],[1,0],[0,1],[-1,0]][dir];
+    const fx=px+f[0],fy=py+f[1],lx=fx+l[0],ly=fy+l[1];
+    if(inside(lx,ly)){px=lx;py=ly;dir=(dir+3)%4;}else if(inside(fx,fy)){px=fx;py=fy;}else dir=(dir+1)%4;
+    if(++guard>limit)break;
+  }while(!(px===sx&&py===sy&&dir===0));
+  return pts.length>=4?pts:null;
+}
+function segDistPt(q,a,b){const vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;let t=L2?((q[0]-a[0])*vx+(q[1]-a[1])*vy)/L2:0;t=Math.max(0,Math.min(1,t));return Math.hypot(q[0]-a[0]-t*vx,q[1]-a[1]-t*vy);}
+function rdpOpen(pts,eps){
+  if(pts.length<3)return pts.slice();
+  const keep=new Uint8Array(pts.length);keep[0]=keep[pts.length-1]=1;const stack=[[0,pts.length-1]];
+  while(stack.length){const [a,b]=stack.pop();let best=-1,bi=-1;
+    for(let i=a+1;i<b;i++){const d=segDistPt(pts[i],pts[a],pts[b]);if(d>best){best=d;bi=i;}}
+    if(best>eps&&bi>0){keep[bi]=1;stack.push([a,bi],[bi,b]);}}
+  return pts.filter((_,i)=>keep[i]);
+}
+function rdpClosed(pts,eps){
+  const n=pts.length;if(n<4)return pts.slice();
+  let far=0,dmax=-1;for(let i=1;i<n;i++){const d=Math.hypot(pts[i][0]-pts[0][0],pts[i][1]-pts[0][1]);if(d>dmax){dmax=d;far=i;}}
+  const a=rdpOpen(pts.slice(0,far+1),eps),b=rdpOpen(pts.slice(far).concat([pts[0]]),eps);
+  const out=a.slice(0,-1).concat(b.slice(0,-1));return out.length>=3?out:pts.slice();
+}
+function extractShape(data,w,h,opt){
+  const bin=imgToBinary(data,w,h,opt.thresh,opt.invert);
+  const fg=labelCC(bin,w,h,1),bg=labelCC(bin,w,h,0);
+  const touch=new Uint8Array(bg.n+1);
+  for(let x=0;x<w;x++){if(bg.lab[x])touch[bg.lab[x]]=1;if(bg.lab[(h-1)*w+x])touch[bg.lab[(h-1)*w+x]]=1;}
+  for(let y=0;y<h;y++){if(bg.lab[y*w])touch[bg.lab[y*w]]=1;if(bg.lab[y*w+w-1])touch[bg.lab[y*w+w-1]]=1;}
+  const S=Math.max(w,h),minA=opt.minArea*w*h;
+  const norm=P=>P.map(q=>[q[0]/S,(h-q[1])/S]);
+  const Ts=[],Hs=[];
+  for(let id=1;id<=fg.n;id++){const c=traceRegion(fg.lab,w,h,id);if(!c)continue;const p=rdpClosed(c,opt.eps);if(Math.abs(OriVers.signedArea(p))<minA)continue;Ts.push(norm(p));}
+  for(let id=1;id<=bg.n;id++){if(touch[id])continue;const c=traceRegion(bg.lab,w,h,id);if(!c)continue;const p=rdpClosed(c,opt.eps);if(Math.abs(OriVers.signedArea(p))<minA)continue;Hs.push(norm(p));}
+  return {T:Ts,holes:Hs,bin,w,h};
+}
+let IMG=null,IMGSHAPE=null;
+function imgOpts(){return {thresh:+$('th').value,eps:+$('eps').value/10,minArea:+$('minar').value/10000,invert:$('inv').checked};}
+function refreshImage(){
+  if(!IMG)return;
+  const box=$('imgstat');
+  try{
+    IMGSHAPE=extractShape(IMG.data,IMG.w,IMG.h,imgOpts());
+    const cv=$('cv-bin'),W=220,H=Math.max(1,Math.round(W*IMG.h/IMG.w));cv.width=W;cv.height=H;
+    const ctx=cv.getContext('2d'),out=ctx.createImageData(W,H);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const on=IMGSHAPE.bin[Math.min(IMG.h-1,Math.floor(y*IMG.h/H))*IMG.w+Math.min(IMG.w-1,Math.floor(x*IMG.w/W))];
+      const i=(y*W+x)*4;out.data[i]=on?46:255;out.data[i+1]=on?90:255;out.data[i+2]=on?135:255;out.data[i+3]=255;}
+    ctx.putImageData(out,0,0);
+    const sv=$('sv-poly');sv.innerHTML='';sv.setAttribute('viewBox','0 0 1 1');
+    if(IMGSHAPE.T.length)el('path',{d:pathOf([...IMGSHAPE.T,...IMGSHAPE.holes],p=>[p[0],1-p[1]]),fill:'#2E5A87','fill-opacity':0.6,'fill-rule':'evenodd',stroke:'#2E5A87','stroke-width':0.005},sv);
+    const nv=IMGSHAPE.T.reduce((s,p)=>s+p.length,0)+IMGSHAPE.holes.reduce((s,p)=>s+p.length,0);
+    box.textContent=`成分 ${IMGSHAPE.T.length}／穴 ${IMGSHAPE.holes.length}／頂点 ${nv}`+(nv>80?'（頂点が多いと計算が重くなります。単純化を強めてください）':'');
+    $('useimg').disabled=!IMGSHAPE.T.length;
+  }catch(e){box.textContent='解析に失敗しました: '+e.message;}
+}
+function loadImageFile(file){
+  if(!file||!/^image\//.test(file.type)){$('imgstat').textContent='画像ファイルを選んでください。';return;}
+  const url=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{
+    const S=Math.max(im.width,im.height),sc=Math.min(1,240/S);
+    const w=Math.max(4,Math.round(im.width*sc)),h=Math.max(4,Math.round(im.height*sc));
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(im,0,0,w,h);
+    IMG={data:ctx.getImageData(0,0,w,h).data,w,h};$('imgctl').hidden=false;URL.revokeObjectURL(url);refreshImage();
+  };
+  im.onerror=()=>{$('imgstat').textContent='画像を読み込めませんでした。';URL.revokeObjectURL(url);};
+  im.src=url;
+}
+{
+  const drop=$('drop');
+  $('imgfile').addEventListener('change',e=>{if(e.target.files&&e.target.files[0])loadImageFile(e.target.files[0]);});
+  for(const ev of ['dragenter','dragover'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');});
+  for(const ev of ['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');});
+  drop.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)loadImageFile(f);});
+  const sync=()=>{$('v-th').textContent=$('th').value;$('v-eps').textContent=($('eps').value/10).toFixed(1)+' px';$('v-min').textContent=($('minar').value/100).toFixed(2)+' %';};
+  for(const id of ['th','eps','minar','inv'])$(id).addEventListener('input',()=>{sync();refreshImage();});
+  $('useimg').onclick=()=>{if(IMGSHAPE&&IMGSHAPE.T.length)setShape({name:'image',T:IMGSHAPE.T,holes:IMGSHAPE.holes});};
+}
+
+/* ---------------- start ---------------- */
+buildPresets();
+renderAll();
+applyMode();
+compute();
+</script>
+</body>
+</html>
